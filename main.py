@@ -2,6 +2,35 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
 # FFZ
+
+def make_sats():
+    data = dict([])
+    allsats = ['G{:02}'.format(num) for num in range(1, 33)]
+    for sat in allsats:
+        data[sat] = []
+    return data
+
+def load_data( data_file ):
+    data = make_sats()
+    with open(data_file, 'r') as f:
+        f.readline()
+        hdr = f.readline()
+        # read 2 lines
+        for line1 in f:
+            line2 = next(f)
+            tmp1 = line1.split()
+            tmp2 = line2.split()
+            nsats = int(tmp1[1])
+            if nsats != -1:
+                sats = tmp1[2:]
+            else:
+                sats = sats
+                nsats = len(sats)
+            # parse the stations and append data
+            for nrec in range(nsats):
+                data[sats[nrec]].append([float(tmp1[0]), float(tmp2[nrec])])
+    return data
+
 n = 1
 lamb = 3e8*1/1.2e9
 npts = 100
@@ -25,67 +54,13 @@ for e in es:
     plt.ylabel('meters')
 plt.show()
 # read in azimuth data
-allsats = ['G{:02}'.format(num) for num in range(1, 33)]
-azimuths = dict([])
-elev = dict([])
-snr = dict([])
-for sat in allsats:
-    azimuths[sat] = []
-    elev[sat] = []
-    snr[sat] = []
-with open('plot_files/rob40110.azi', 'r') as f:
-    f.readline()
-    hdr = f.readline()
-    # read 2 lines
-    for line1 in f:
-        line2 = next(f)
-        tmp1 = line1.split()
-        tmp2 = line2.split()
-        nsats = int(tmp1[1])
-        if nsats != -1:
-            sats = tmp1[2:]
-        else:
-            sats = sats
-            nsats = len(sats)
-        # parse the stations and append data
-        for nrec in range(nsats):
-            azimuths[sats[nrec]].append([float(tmp1[0]), float(tmp2[nrec])])
 
-with open('plot_files/rob40110.ele', 'r') as f:
-    f.readline()
-    hdr = f.readline()
-    # read 2 lines
-    for line1 in f:
-        line2 = next(f)
-        tmp1 = line1.split()
-        tmp2 = line2.split()
-        nsats = int(tmp1[1])
-        if nsats != -1:
-            sats = tmp1[2:]
-        else:
-            sats = sats
-            nsats = len(sats)
-        # parse the stations and append data
-        for nrec in range(nsats):
-            elev[sats[nrec]].append([float(tmp1[0]), float(tmp2[nrec])])
 
-with open('plot_files/rob40110.sn2', 'r') as f:
-    f.readline()
-    hdr = f.readline()
-    # read 2 lines
-    for line1 in f:
-        line2 = next(f)
-        tmp1 = line1.split()
-        tmp2 = line2.split()
-        nsats = int(tmp1[1])
-        if nsats != -1:
-            sats = tmp1[2:]
-        else:
-            sats = sats
-            nsats = len(sats)
-        # parse the stations and append data
-        for nrec in range(nsats):
-            snr[sats[nrec]].append([float(tmp1[0]), float(tmp2[nrec])])
+
+azimuths=load_data('plot_files/rob40110.azi')
+elev = load_data('plot_files/rob40110.ele')
+snr = load_data('plot_files/rob40110.sn2')
+
 
 ax = plt.subplot(111, projection='polar')
 allsats = ['G01']
