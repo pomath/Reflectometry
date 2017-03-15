@@ -90,3 +90,5 @@ ENV/
 
 # Other
 plot_files/
+demian_code/
+*.pdf
