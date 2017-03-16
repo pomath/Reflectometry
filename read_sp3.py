@@ -55,17 +55,111 @@ def int_sp3(sp3file, splint):
         SAT[sv] = np.vstack((T, Xi, Yi, Zi))
     return SAT
 
+
+def xyz2wgs(S):
+
+    a = 6378137.0
+    b = 6356752.314
+    f = 1.0 / 298.257222101
+    eo = 2 * f - f ** 2
+    el = (a ** 2 - b ** 2) / b ** 2
+    t = S[:,0]
+    x = S[:,1]
+    y = S[:,2]
+    z = S[:,3]
+    p = np.sqrt(x ** 2 + y ** 2)
+    theta = np.arctan2(z * a, p * b)
+    phi = np.arctan2(z + np.sin(theta)**3 * el * b, p - np.cos(theta)**3 * eo **2 * a)
+    lam = np.arctan2(y, x)
+
+    N = a ** 2 / np.sqrt(np.cos(phi)**2 * a**2 + np.sin(phi) ** 2 * b ** 2)
+    alt = (p / np.cos(phi)) - N
+    R = np.vstack((t, lam * 180 / np.pi, phi * 180 / np.pi, alt)).T
+    return R
+
+def azelle(S, P):
+
+    
+    Xs = S[1,:]
+    Ys = S[2,:]
+    Zs = S[3,:]
+    XR = P[0]
+    YR = P[1]
+    ZR = P[2]
+
+    Xs = np.subtract(Xs, XR)
+    Ys = np.subtract(Ys, YR)
+    Zs = np.subtract(Zs, ZR)
+
+    Xs = np.reshape(Xs, (len(Xs),1))
+    Ys = np.reshape(Ys, (len(Ys),1))
+    Zs = np.reshape(Zs, (len(Zs),1))
+
+
+
+    rang = np.sqrt(Xs ** 2 + Ys ** 2 + Zs ** 2)
+
+    Xu = Xs / rang
+    Yu = Ys / rang
+    Zu = Zs / rang
+
+    Ru = np.hstack((Xu, Yu, Zu))
+    return Ru
+
+
+# Working Area
+P = np.array([-371052.136, -1676729.269, -6122039.258]) #Backer Island
 sp3file = 'igs19300.sp3'
 SAT = int_sp3(sp3file, 30)
-
-#def azelle(S, P):
-P = np.array([-371052.136, -1676729.269, -6122039.258]) #Backer Island
 S = SAT['G32']
-Xs = S[1,:]
-Ys = S[2,:]
-Zs = S[3,:]
-XR = P[0]
-YR = P[1]
-ZR = P[2]
+
+Ru = azelle(S, P)
+O = P
+V = Ru
+#def xyz2neu(O, V):
+
+X = V[:,0]
+Y = V[:,1]
+Z = V[:,2]
+
+NEU = np.array([])
+R = np.ones_like(V)
+XR = R[:,0] * O[0]
+YR = R[:,1] * O[1]
+ZR = R[:,2] * O[2]
+
+T = np.zeros_like(XR)
+
+Er = np.vstack((T, XR, YR, ZR)).T
+E = xyz2wgs(Er)
+
+E[:,1] = E[:,1] * np.pi/180.
+E[:,2] = E[:,2] * np.pi/180.
+
+cp = np.cos(E[:,1])
+sp = np.sin(E[:,1])
+cl = np.cos(E[:,2])
+sl = np.sin(E[:,2])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
