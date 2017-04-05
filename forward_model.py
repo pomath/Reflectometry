@@ -58,13 +58,14 @@ class Reflect:
         '''
         Plots the frequency on a track.
         '''
+        samp = 1
         ax = plt.subplot(111, projection='polar')
         for key in self.elevation:
             if self.azimuth[key]:
                 color = [str(item/255.) for item in self.omega[key]]
                 polars = [(np.radians(x[1]), 90-y[1]) for x, y in
                           zip(self.azimuth[key], self.elevation[key])]
-                Q = plt.scatter(*zip(*polars[0::15]), c=color[0::15], s=.5, cmap='Pastel1_r')
+                Q = plt.scatter(*zip(*polars[::samp]), c=color[::samp], s=.5, cmap='Pastel1_r')
         labels = (1 / np.linspace(*(self.maxminOmega), 12)).tolist()
         labels = ['{:4.2}'.format(x) for x in labels]
         cbar = plt.colorbar(Q, spacing='uniform')
