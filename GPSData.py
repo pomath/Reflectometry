@@ -1,3 +1,7 @@
+'''
+convert from dicts to 32 x n numpy arrays
+'''
+
 import numpy as np
 
 class GPSData:

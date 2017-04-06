@@ -1,3 +1,9 @@
+'''
+download data
+make the plot files
+load into numpy arrays and save as binaries
+'''
+
 import subprocess
 
 
