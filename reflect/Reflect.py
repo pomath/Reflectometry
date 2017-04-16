@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import ticker
-from GPSData import GPSData
+import snowy
 
 class Reflect:
     '''
@@ -14,9 +14,9 @@ class Reflect:
         self.tilt = np.radians(tilt)
         self.dataFile = dataFile
         self.height = height
-        self.azimuth = GPSData(dataFile + '.azi').data
-        self.elevation = GPSData(dataFile + '.ele').data
-        self.SNR = GPSData(dataFile + '.sn1').data
+        self.azimuth = snowy.Data(dataFile + '.azi').data
+        self.elevation = snowy.Data(dataFile + '.ele').data
+        self.SNR = snowy.Data(dataFile + '.sn1').data
         self.get_omega()
         self.label = 'FWD_' + str(self.height) + 'm_' + '{:4.4}deg'.format(np.degrees(self.tilt))
 
@@ -45,8 +45,8 @@ class Reflect:
                 theta = np.array([y[1] for y in dat],dtype='float64')
                 time = np.array([y[0] for y in dat],dtype='float64')
                 dt = np.gradient(time)
-                dtheta = np.gradient(theta)
-                self.omega[sat] = (4 * np.pi * self.height)/(0.244) * np.cos(np.radians(theta) - self.tilt) * (dtheta/dt)
+                dtheta = np.gradient(np.radians(theta), dt)
+                self.omega[sat] = (4 * np.pi * self.height)/(0.244) * np.cos(np.radians(theta) - self.tilt) * (dtheta)
                 self.omega[sat] = abs(self.omega[sat])
                 if min(self.omega[sat]) < minVal:
                     minVal = min(self.omega[sat])
@@ -65,10 +65,10 @@ class Reflect:
                 color = [str(item/255.) for item in self.omega[key]]
                 polars = [(np.radians(x[1]), 90-y[1]) for x, y in
                           zip(self.azimuth[key], self.elevation[key])]
-                Q = plt.scatter(*zip(*polars[::samp]), c=color[::samp], s=.5, cmap='Pastel1_r')
+                Q = plt.scatter(*zip(*polars[::samp]), c=color[::samp], s=.5, cmap='viridis')
         labels = (1 / np.linspace(*(self.maxminOmega), 12)).tolist()
-        labels = ['{:4.2}'.format(x) for x in labels]
-        cbar = plt.colorbar(Q, spacing='uniform')
+        labels = ['{:4.5}'.format(x) for x in labels]
+        cbar = plt.colorbar(Q)
         tick_locator = ticker.MaxNLocator(nbins=12)
         cbar.locator = tick_locator
         cbar.update_ticks()
@@ -93,7 +93,7 @@ class Reflect:
 if __name__ == '__main__':
     '''
     '''
-    R = Reflect('plot_files/rob40110', 3, 0)
+    R = Reflect('plot_files/mkea0010', 1.8, 0)
     R.plot_omega()
 
 

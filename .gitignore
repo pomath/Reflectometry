@@ -92,3 +92,5 @@ ENV/
 plot_files/
 demian_code/
 *.pdf
+*.dat
+plots/

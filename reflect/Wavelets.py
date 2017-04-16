@@ -134,8 +134,9 @@ class Cwt:
             self.scales=NP.zeros(self.nscale,float)
             for j in range(self.nscale):
                 self.scales[j] = ndata/(self.scale*(2.0**(float(self.nscale-1-j)/notes)))
+
         elif scaling=="linear":
-            nmax=ndata/largestscale/2
+            nmax=ndata/largestscale/2 # max scale is equal to N / (2 * J)
             self.scales=NP.arange(float(2),float(nmax))
             self.nscale=len(self.scales)
         else: raise ValueError("scaling must be linear or log")
@@ -331,8 +332,8 @@ if __name__=="__main__":
     wavelet=Morlet
     maxscale=4
     notes=16
-    scaling="log" #or "linear"
-    #scaling="linear"
+    #scaling="log" #or "linear"
+    scaling="linear"
     plotpower2d=True
 
     # set up some data
@@ -379,7 +380,7 @@ if __name__=="__main__":
     mpl.plot(x,A,'b-')
     mpl.xlim(Nlo*1.0,Nhi*1.0)
     ax2.xaxis.set_ticklabels(["",""])
-    mpl.text(0.5,0.9,"Wavelet example with extra panes",
+    mpl.text(0.5,0.9,"Wavelet Example",
          fontsize=14,bbox=dict(facecolor='green',alpha=0.2),
          transform = fig.transFigure,horizontalalignment='center')
 
@@ -394,5 +395,6 @@ if __name__=="__main__":
         mpl.semilogx(scalespec/vara+0.01,y,'b-')
     mpl.ylim(y[0],y[-1])
     mpl.xlim(1000.0,0.01)
-    
+    mpl.savefig('waveletsExample.eps', format='eps', dpi=1000)
     mpl.show()
+    
