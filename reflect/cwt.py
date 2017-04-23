@@ -32,16 +32,16 @@ import matplotlib.pyplot as plt
 import pycwt as wavelet
 from pycwt.helpers import find
 from matplotlib.image import NonUniformImage
-from snowyWavelet import snowyWavelet
+
 # This script allows different sample data sets to be analysed. Simply comment
 # and uncomment the respective fname, title, label, t0, dt and units variables
 # to see the different results. t0 is the starting time, dt is the temporal
 # sampling step
 
-sample = 'MKEA'
+sample = 'CERI'
 usetex = False
-if sample == 'MKEA':
-    title = 'Signal'
+if sample == 'CERI':
+    title = 'CERI'
     fname = 'mkea.dat'
     t0 = 0
     dt = 1
@@ -77,9 +77,9 @@ B=np.sin(2.0*np.pi*x/32.0)
 A[512:768]+=B[0:256]
 var = A
 
-#var = np.loadtxt(fname)
+var = np.loadtxt('snr.dat')
 
-avg1, avg2 = (8, 200)                  # Range of periods to average
+avg1, avg2 = (32, 2048)                  # Range of periods to average
 slevel = 0.95                        # Significance level
 
 std = var.std()                      # Standard deviation
@@ -87,11 +87,12 @@ std2 = std ** 2                      # Variance
 var = (var - var.mean()) / std       # Calculating anomaly and normalizing
 
 N = var.size                         # Number of measurements
-time = np.arange(0, N) * dt + t0     # Time array in years
+print(N)
+time = np.arange(0, N) * 1 + t0     # Time array in years
 
-dj = 1/60                            # 30 sub-octaves per octave
+dj = 1/30                            # 30 sub-octaves per octave
 s0 = 2 * dt                       # Starting scale, here 2 seconds
-J = 7 / dj                        # Seven powers of two with dj sub-octaves
+J = 10 / dj                        # Seven powers of two with dj sub-octaves
 alpha = 0
 #alpha, _, _ = wavelet.ar1(var)      # Lag-1 autocorrelation for red noise
 
@@ -176,6 +177,8 @@ bx.fill(np.concatenate([time, time[-1:]+dt, time[-1:]+dt,time[:1]-dt,
         time[:1]-dt]), (np.concatenate([np.log2(coi),[1e-9], 
         np.log2(period[-1:]), np.log2(period[-1:]), [1e-9]])), 'k', alpha=0.3,
          hatch='x')
+maxperiod=np.load('maxperiod.npy')
+bx.plot(time, np.log2(maxperiod), 'r.')
 bx.set_title('b) %s Wavelet Power Spectrum (%s)' % (label, mother.name))
 bx.set_ylabel('Period (seconds)')
 #
