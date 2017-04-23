@@ -16,7 +16,8 @@ class refData:
                  'cw', 'periods', 'ele',
                  'dele', 'clipEle', 'h',
                  'azi', 'clipAzi', 'samprate',
-                 'invH', 'invTilt', 'omg0', 'Mg']
+                 'invH', 'invTilt', 'omg0',
+                 'Mg', 'residual']
 
     def __init__(self, sat='G01', clipRange=(0, 10000), synthH = 1.0, synthT = 0.0):
         self.R = Reflect('../plot_files/ceri0390', synthH, synthT)
@@ -141,6 +142,7 @@ class refData:
         dh = 4 * np.pi / 0.244 * np.cos( self.clipEle - Mstart[1] ) * dele
         dl =  - 4 * np.pi / 0.244 * Mstart[0] * np.sin(self.clipEle - Mstart[1]) * dele
         self.Mg = np.array([])
+        self.residual = np.array([])
         resolution = 6518
         print(factors(self.clipEle.size), resolution)
         dl = np.split(dl, resolution)
@@ -158,11 +160,12 @@ class refData:
             #Gg = np.linalg.pinv(G)
             omega = 1/p
             mg = np.dot(Gg, (omega - om))
+            dg = np.dot(G, mg)
+            self.residual = np.append(self.residual, np.linalg.norm(dg - om))
             self.invH = mg[0] + Mstart[0]
             self.invTilt = mg[1] + Mstart[1]
             self.Mg = np.append(self.Mg, [self.invH, self.invTilt])
-            #print(self.invH, np.degrees(self.invTilt), modelRes, dataRes)
-        np.save('Mg.npy', Mg)
+        np.save('Mg.npy', self.Mg)
 
     def plotHeight(self):
         '''
@@ -213,9 +216,7 @@ class refData:
         self.clipT = trim(self.clipT, trimval)
         self.clipEle = trim(self.clipEle, trimval)
         self.omg0 = trim(self.omg0, trimval)
-        
-    def residual(self):
-        
+
 
 
 def trim(A, trimval):
@@ -250,6 +251,10 @@ if __name__ == '__main__':
     t.linearInvert()
     t.loadSynthOmega(sat, clipRange)
     t.fullInverse()
+    print(t.residual)
+    plt.plot(t.residual)
+    plt.ylim((0, 5))
+    plt.show()
     #np.savetxt('snr.dat', t.clipAm)
     #t.plotHeight()
 
