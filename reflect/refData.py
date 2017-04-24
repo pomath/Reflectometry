@@ -143,13 +143,13 @@ class refData:
         dl =  - 4 * np.pi / 0.244 * Mstart[0] * np.sin(self.clipEle - Mstart[1]) * dele
         self.Mg = np.array([])
         self.residual = np.array([])
-        resolution = 379
+        resolution = 19
         print(factors(self.clipEle.size), resolution)
         dl = np.split(dl, resolution)
         dh = np.split(dh, resolution)
         per = np.split(self.periods, resolution)
         omg0 = np.split(self.omg0, resolution)
-        err = np.split(np.ones((len(self.periods),)) * 0.5, resolution)
+        err = np.split(np.ones((len(self.periods),)) * 0.005, resolution)
         #err = np.split(self.error, resolution)
         for h, l, p, om, e in zip(dh, dl, per, omg0, err):
             G = np.array([ h, l]).T
@@ -245,26 +245,28 @@ if __name__ == '__main__':
     np.set_printoptions(precision=2, suppress=True, linewidth=120)
     clipRange=(0, 9000)
     sat = 'G01'
-    Mstart = (10.5, 15)
-    height, tilt = 10, 1
+    
+    height, tilt = 10, 10
     t = refData(sat, clipRange, height, tilt)
 
     #t.R.plotOmegaFWD()
     t.loadSynthetic(sat, clipRange)
+    Mstart = (10, 10)
+    t.linearInvert()
+    #print(t.h)
+    Mstart = (t.h[0], 10)
     t.loadSynthOmega(sat, clipRange, Mstart)
     #t.retrSat(sat)
     #t.fitAd()
     #t.clip(clipRange)
     #np.savetxt('snr.dat', t.clipAm)
     #t.CWT()
-    t.linearInvert()
-    #print(t.h)
+
     t.fullInverse(Mstart)
-    plt.plot(t.clipT[::19], t.residual)
+    Q = plt.scatter(t.Mg[0::2], t.Mg[1::2], c=t.residual, lw=0)
+    plt.scatter(height, tilt, c='k', lw=0)
+    plt.colorbar(Q)
     plt.show()
-    plt.plot(t.Mg, '.')
-    plt.show()
-    t.HvsT()
     #print(t.Mg, np.average(t.residual))
     #print(t.residual)
     #plt.plot(t.residual)
