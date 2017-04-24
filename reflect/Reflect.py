@@ -72,7 +72,7 @@ class Reflect:
                 color = [str(item/255.) for item in self.omega[key]]
                 polars = [(np.radians(x[1]), 90-y[1]) for x, y in
                           zip(self.azimuth[key], self.elevation[key])]
-                Q = plt.scatter(*zip(*polars[::samp]), c=color[::samp], s=.5, cmap='viridis')
+                Q = plt.scatter(*zip(*polars[::samp]), c=color[::samp], s=2, cmap='viridis', lw=0)
         labels = (1 / np.linspace(*(self.maxminOmega), 12)).tolist()
         labels = ['{:4.5}'.format(x) for x in labels]
         cbar = plt.colorbar(Q)
@@ -89,9 +89,9 @@ class Reflect:
         ax.set_yticks(range(0, 90, 10))
         ax.set_yticklabels(map(str, range(90, 0, -10)))
         plt.title(self.label)
-        plt.show()
-        #plt.savefig(self.label + '.eps', format='eps', dpi=1000)
-        #print('Saved: ', self.label)
+        #plt.show()
+        plt.savefig(self.label + '.eps', format='eps', dpi=1000)
+        print('Saved: ', self.label)
 
     def saveSNR(self):
         '''
@@ -109,7 +109,7 @@ if __name__ == '__main__':
     '''
     An example usage to create the forward model.
     '''
-    R = Reflect('../plot_files/ceri0390', 1.8, 0)
+    R = Reflect('../plot_files/ceri0390', 10, 10)
     R.plotOmegaFWD()
 
 

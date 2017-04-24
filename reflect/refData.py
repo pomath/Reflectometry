@@ -17,7 +17,7 @@ class refData:
                  'dele', 'clipEle', 'h',
                  'azi', 'clipAzi', 'samprate',
                  'invH', 'invTilt', 'omg0',
-                 'Mg', 'residual']
+                 'Mg', 'residual', 'error']
 
     def __init__(self, sat='G01', clipRange=(0, 10000), synthH = 1.0, synthT = 0.0):
         self.R = Reflect('../plot_files/ceri0390', synthH, synthT)
@@ -126,7 +126,7 @@ class refData:
         self.dele = np.gradient(self.clipEle, dt)
         self.h = (0.244 / (4 * np.pi * self.samprate * self.periods)) / (np.cos(self.clipEle) * self.dele)
 
-    def fullInverse(self, Mstart = (1, 0)):
+    def fullInverse(self, Mstart = (10, 10)):
         '''
         Solves for the tilt and the height.
         First needs to gather a lot of w for each elevation angle.
@@ -143,13 +143,15 @@ class refData:
         dl =  - 4 * np.pi / 0.244 * Mstart[0] * np.sin(self.clipEle - Mstart[1]) * dele
         self.Mg = np.array([])
         self.residual = np.array([])
-        resolution = 6518
+        resolution = 379
         print(factors(self.clipEle.size), resolution)
         dl = np.split(dl, resolution)
         dh = np.split(dh, resolution)
         per = np.split(self.periods, resolution)
         omg0 = np.split(self.omg0, resolution)
-        for h, l, p, om in zip(dh, dl, per, omg0):
+        err = np.split(np.ones((len(self.periods),)) * 0.5, resolution)
+        #err = np.split(self.error, resolution)
+        for h, l, p, om, e in zip(dh, dl, per, omg0, err):
             G = np.array([ h, l]).T
             U, S, V = np.linalg.svd(G, full_matrices=False)
             if (not np.any(S)):
@@ -161,7 +163,8 @@ class refData:
             omega = 1/p
             mg = np.dot(Gg, (omega - om))
             dg = np.dot(G, mg)
-            self.residual = np.append(self.residual, np.linalg.norm(dg - om))
+            res = np.linalg.norm((dg - omega)/e) #/ omega
+            self.residual = np.append(self.residual, res)
             self.invH = mg[0] + Mstart[0]
             self.invTilt = mg[1] + Mstart[1]
             self.Mg = np.append(self.Mg, [self.invH, self.invTilt])
@@ -188,7 +191,7 @@ class refData:
         #print('Saved: ', self.label)
 
     def HvsT(self):
-        plt.plot(self.clipT, self.h)
+        plt.plot(self.h,'.')
         #plt.xlim((300, 9000))
         plt.show()
 
@@ -203,6 +206,7 @@ class refData:
         self.periods = periods[:self.clipT.size]
         self.clipEle = self.ele[:self.clipT.size]
         self.clipAzi = self.azi[:self.clipT.size]
+        #self.error = np.ones((len(self.periods), )) * 0.5
 
     def loadSynthOmega(self, sat, clipRange, Mstart = (1, 0)):
         synthR = Reflect('../plot_files/ceri0390', Mstart[0], Mstart[1])
@@ -217,6 +221,9 @@ class refData:
         self.clipEle = trim(self.clipEle, trimval)
         self.omg0 = trim(self.omg0, trimval)
 
+    def runSynthetic(self, sat):
+        self.retrSat(sat)
+        self.loadSynthetic(sat, clipRange)
 
 
 def trim(A, trimval):
@@ -236,25 +243,33 @@ def factors(n):
 
 if __name__ == '__main__':
     np.set_printoptions(precision=2, suppress=True, linewidth=120)
-    clipRange=(0, 18000)
+    clipRange=(0, 9000)
     sat = 'G01'
-    t = refData(sat, clipRange, 1, 10)
-    
+    Mstart = (10.5, 15)
+    height, tilt = 10, 1
+    t = refData(sat, clipRange, height, tilt)
+
     #t.R.plotOmegaFWD()
-    #t.loadSynthetic(sat, clipRange)
-    
-    t.retrSat(sat)
-    t.fitAd()
-    t.clip(clipRange)
-    np.savetxt('snr.dat', t.clipAm)
-    t.CWT()
+    t.loadSynthetic(sat, clipRange)
+    t.loadSynthOmega(sat, clipRange, Mstart)
+    #t.retrSat(sat)
+    #t.fitAd()
+    #t.clip(clipRange)
+    #np.savetxt('snr.dat', t.clipAm)
+    #t.CWT()
     t.linearInvert()
-    t.loadSynthOmega(sat, clipRange)
-    t.fullInverse()
-    print(t.residual)
-    plt.plot(t.residual)
-    plt.ylim((0, 5))
+    #print(t.h)
+    t.fullInverse(Mstart)
+    plt.plot(t.clipT[::19], t.residual)
     plt.show()
+    plt.plot(t.Mg, '.')
+    plt.show()
+    t.HvsT()
+    #print(t.Mg, np.average(t.residual))
+    #print(t.residual)
+    #plt.plot(t.residual)
+    #plt.ylim((0, 5))
+    #plt.show()
     #np.savetxt('snr.dat', t.clipAm)
     #t.plotHeight()
 
