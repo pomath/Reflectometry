@@ -4,6 +4,7 @@ import numpy as np
 import pycwt as wavelet
 from pycwt.helpers import find
 from functools import reduce
+from scipy.optimize import minimize
 '''
 routines:
 extract a full satellite track between a set time range
@@ -137,7 +138,11 @@ class refData:
         
         -currently just ignores any pinv with a zero singular value
         '''
+        print(Mstart)
         #self.clipPeriod()
+        sat='G01'
+        clipRange = (0, 200)
+        self.loadSynthOmega(sat, clipRange, Mstart)
         dt = np.gradient(self.clipT)
         self.dele = np.gradient(self.clipEle, dt)
         const = 4 * np.pi / 0.244 * self.dele
@@ -145,8 +150,8 @@ class refData:
         dl =  - Mstart[0] * np.sin(self.clipEle - Mstart[1])
         self.Mg = np.array([])
         self.residual = np.array([])
-        resolution = 1091
-        print(factors(self.clipEle.size), resolution)
+        resolution = 1
+        #print(factors(self.clipEle.size), resolution)
         dl = np.split(dl, resolution)
         dh = np.split(dh, resolution)
         fre = np.split(self.freqs, resolution)
@@ -171,10 +176,11 @@ class refData:
             self.invTilt = mg[1] + Mstart[1]
             self.Mg = np.append(self.Mg, [self.invH, self.invTilt])
         np.save('Mg.npy', self.Mg)
+        return self.residual[0]
 
     def plotHeight(self):
         '''
-        Plots the frequency on a track.
+        Plots the height on a track.
         '''
         print("Plotting height " + u"\u2713")
         ax = plt.subplot(111, projection='polar')
@@ -270,7 +276,7 @@ def factors(n):
 
 if __name__ == '__main__':
     np.set_printoptions(precision=2, suppress=True, linewidth=120)
-    clipRange=(0, 12000)
+    clipRange=(0, 200)
     sat = 'G01'
     
     height, tilt = 10, 0
@@ -278,7 +284,7 @@ if __name__ == '__main__':
 
     #t.R.plotOmegaFWD()
     t.loadSynthetic(sat, clipRange)
-    Mstart = (10, 0.1)
+    Mstart = (10, 0)
     #print(t.h)
 
     #t.retrSat(sat)
@@ -286,16 +292,19 @@ if __name__ == '__main__':
     #t.clip(clipRange)
     #np.savetxt('snr.dat', t.clipAm)
     #t.CWT()
+    
     t.linearInvert()
-    t.HvsT()
+    #t.HvsT()
     t.loadSynthOmega(sat, clipRange, Mstart)
-    t.fullInverse(Mstart)
-    Q = plt.scatter(t.Mg[0::2], t.Mg[1::2], c=t.residual, lw=0)
-    plt.scatter(height, tilt, marker='x', c='k')
-    plt.colorbar(Q)
-    plt.xlabel('Height m')
-    plt.ylabel('Tilt (degrees)')
-    plt.show()
+    res = minimize(t.fullInverse, Mstart, method='nelder-mead',
+                   options={'xtol': 1e-3, 'disp': True})
+    print(res.x)
+    #Q = plt.scatter(t.Mg[0::2], t.Mg[1::2], c=t.residual, lw=0)
+    #plt.scatter(height, tilt, marker='x', c='k')
+    #plt.colorbar(Q)
+    #plt.xlabel('Height m')
+    #plt.ylabel('Tilt (degrees)')
+    #plt.show()
     #print(t.Mg, np.average(t.residual))
     #print(t.residual)
     #plt.plot(t.residual)
