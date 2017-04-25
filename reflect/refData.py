@@ -17,7 +17,8 @@ class refData:
                  'dele', 'clipEle', 'h',
                  'azi', 'clipAzi', 'samprate',
                  'invH', 'invTilt', 'omg0',
-                 'Mg', 'residual', 'error']
+                 'Mg', 'residual', 'error',
+                 'freqs']
 
     def __init__(self, sat='G01', clipRange=(0, 10000), synthH = 1.0, synthT = 0.0):
         self.R = Reflect('../plot_files/ceri0390', synthH, synthT)
@@ -117,6 +118,7 @@ class refData:
         maxperiod[-trimval:] = -1
         np.save('maxperiod.npy', maxperiod)
         self.periods = maxperiod
+        self.freqs = 1 / maxperiod
 
     def linearInvert(self):
         '''
@@ -124,7 +126,7 @@ class refData:
         '''
         dt = np.gradient(self.clipT)
         self.dele = np.gradient(self.clipEle, dt)
-        self.h = (0.244 / (4 * np.pi * self.samprate * self.periods)) / (np.cos(self.clipEle) * self.dele)
+        self.h = (self.freqs * 0.244 / (4 * np.pi * self.samprate )) / (np.cos(self.clipEle) * self.dele)
 
     def fullInverse(self, Mstart = (10, 10)):
         '''
@@ -135,24 +137,25 @@ class refData:
         
         -currently just ignores any pinv with a zero singular value
         '''
-        self.clipPeriod()
+        #self.clipPeriod()
         dt = np.gradient(self.clipT)
-        dele = np.gradient(self.clipEle, dt)
-
-        dh = 4 * np.pi / 0.244 * np.cos( self.clipEle - Mstart[1] ) * dele
-        dl =  - 4 * np.pi / 0.244 * Mstart[0] * np.sin(self.clipEle - Mstart[1]) * dele
+        self.dele = np.gradient(self.clipEle, dt)
+        const = 4 * np.pi / 0.244 * self.dele
+        dh = np.cos(self.clipEle - Mstart[1])
+        dl =  - Mstart[0] * np.sin(self.clipEle - Mstart[1])
         self.Mg = np.array([])
         self.residual = np.array([])
-        resolution = 19
+        resolution = 1091
         print(factors(self.clipEle.size), resolution)
         dl = np.split(dl, resolution)
         dh = np.split(dh, resolution)
-        per = np.split(self.periods, resolution)
+        fre = np.split(self.freqs, resolution)
         omg0 = np.split(self.omg0, resolution)
-        err = np.split(np.ones((len(self.periods),)) * 0.005, resolution)
+        err = np.split(np.ones((len(self.freqs),)), resolution)
+        const = np.split(const, resolution)
         #err = np.split(self.error, resolution)
-        for h, l, p, om, e in zip(dh, dl, per, omg0, err):
-            G = np.array([ h, l]).T
+        for h, l, f, om, e, k in zip(dh, dl, fre, omg0, err, const):
+            G = np.array([ k*h, k*l]).T
             U, S, V = np.linalg.svd(G, full_matrices=False)
             if (not np.any(S)):
                 pass
@@ -160,10 +163,9 @@ class refData:
             modelRes = np.dot(V, V.T)
             dataRes = np.dot(U, U.T)
             #Gg = np.linalg.pinv(G)
-            omega = 1/p
-            mg = np.dot(Gg, (omega - om))
+            mg = np.dot(Gg, (f - om))
             dg = np.dot(G, mg)
-            res = np.linalg.norm((dg - omega)/e) #/ omega
+            res = np.linalg.norm((dg - f)/e) ** 2
             self.residual = np.append(self.residual, res)
             self.invH = mg[0] + Mstart[0]
             self.invTilt = mg[1] + Mstart[1]
@@ -198,12 +200,12 @@ class refData:
     def loadSynthetic(self, sat, clipRange):
         self.R.omegaFWD()
         self.T = np.array([x[0] for x in self.R.azimuth[sat]])
-        periods = np.array([1/x for x in self.R.omega[sat]])
+        freqs = np.array([x for x in self.R.omega[sat]])
         self.azi = np.array([np.radians(x[1]) for x in self.R.azimuth[sat]])
         self.ele = np.array([np.radians(x[1]) for x in self.R.elevation[sat]])
         self.clipT = self.T - self.T[0]
         self.clipT = self.clipT[self.clipT <= clipRange[1]]
-        self.periods = periods[:self.clipT.size]
+        self.freqs = freqs[:self.clipT.size]
         self.clipEle = self.ele[:self.clipT.size]
         self.clipAzi = self.azi[:self.clipT.size]
         #self.error = np.ones((len(self.periods), )) * 0.5
@@ -216,15 +218,40 @@ class refData:
 
     def clipPeriod(self):
         trimval = self.periods.size // 10
-        self.periods = trim(self.periods, trimval)
+        self.freqs = trim(self.freqs, trimval)
         self.clipT = trim(self.clipT, trimval)
         self.clipEle = trim(self.clipEle, trimval)
         self.omg0 = trim(self.omg0, trimval)
 
     def runSynthetic(self, sat):
-        self.retrSat(sat)
-        self.loadSynthetic(sat, clipRange)
+        clipRange=(0, 12000)
+        sat = 'G01'
+        
+        height, tilt = 10, 10
+        t = refData(sat, clipRange, height, tilt)
 
+        #t.R.plotOmegaFWD()
+        t.loadSynthetic(sat, clipRange)
+        Mstart = (10, 10)
+        t.linearInvert()
+        #print(t.h)
+        Mstart = (t.h[0], 10)
+        t.loadSynthOmega(sat, clipRange, Mstart)
+        #t.retrSat(sat)
+        #t.fitAd()
+        #t.clip(clipRange)
+        #np.savetxt('snr.dat', t.clipAm)
+        #t.CWT()
+
+        t.fullInverse(Mstart)
+        Q = plt.scatter(t.Mg[0::2], t.Mg[1::2], c=t.residual, lw=0)
+        plt.scatter(height, tilt, marker='x', c='k')
+        plt.colorbar(Q)
+        plt.xlim((9, 11))
+        plt.ylim((9, 11))
+        plt.xlabel('Height m')
+        plt.ylabel('Tilt (degrees)')
+        plt.show()
 
 def trim(A, trimval):
     A = np.delete(A, np.s_[:trimval])
@@ -243,29 +270,31 @@ def factors(n):
 
 if __name__ == '__main__':
     np.set_printoptions(precision=2, suppress=True, linewidth=120)
-    clipRange=(0, 9000)
+    clipRange=(0, 12000)
     sat = 'G01'
     
-    height, tilt = 10, 10
+    height, tilt = 10, 0
     t = refData(sat, clipRange, height, tilt)
 
     #t.R.plotOmegaFWD()
     t.loadSynthetic(sat, clipRange)
-    Mstart = (10, 10)
-    t.linearInvert()
+    Mstart = (10, 0.1)
     #print(t.h)
-    Mstart = (t.h[0], 10)
-    t.loadSynthOmega(sat, clipRange, Mstart)
+
     #t.retrSat(sat)
     #t.fitAd()
     #t.clip(clipRange)
     #np.savetxt('snr.dat', t.clipAm)
     #t.CWT()
-
+    t.linearInvert()
+    t.HvsT()
+    t.loadSynthOmega(sat, clipRange, Mstart)
     t.fullInverse(Mstart)
     Q = plt.scatter(t.Mg[0::2], t.Mg[1::2], c=t.residual, lw=0)
-    plt.scatter(height, tilt, c='k', lw=0)
+    plt.scatter(height, tilt, marker='x', c='k')
     plt.colorbar(Q)
+    plt.xlabel('Height m')
+    plt.ylabel('Tilt (degrees)')
     plt.show()
     #print(t.Mg, np.average(t.residual))
     #print(t.residual)
@@ -274,7 +303,6 @@ if __name__ == '__main__':
     #plt.show()
     #np.savetxt('snr.dat', t.clipAm)
     #t.plotHeight()
-
     #t.HvsT()
     
 
