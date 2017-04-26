@@ -24,6 +24,8 @@ class refData:
     def __init__(self, sat='G01', clipRange=(0, 10000), synthH = 1.0, synthT = 0.0):
         self.R = Reflect('../plot_files/ceri0390', synthH, synthT)
         self.samprate = 1
+        self.Mg = np.array([])
+        self.residual = np.array([])
 
     def retrSat(self, sat:str):
         temp = self.R.SNR[sat]
@@ -49,7 +51,7 @@ class refData:
 
     def clip(self, clipRange:tuple):
         self.clipT = self.T - self.T[0]
-        self.clipT = self.clipT[self.clipT <= clipRange[1]]
+        self.clipT = self.clipT[clipRange[0]:clipRange[1]]
         self.clipAm = self.Am[:self.clipT.size]
         self.clipEle = self.ele[:self.clipT.size]
         self.clipAzi = self.azi[:self.clipT.size]
@@ -138,25 +140,25 @@ class refData:
         
         -currently just ignores any pinv with a zero singular value
         '''
-        print(Mstart)
+
         #self.clipPeriod()
         sat='G01'
-        clipRange = (0, 200)
+        clipRange = (0, 2)
+        newinds = (3737, 3739)
+        starttilt = np.radians(Mstart[1])
         self.loadSynthOmega(sat, clipRange, Mstart)
-        dt = np.gradient(self.clipT)
-        self.dele = np.gradient(self.clipEle, dt)
+        dt = np.gradient(self.clipT[newinds[0]:newinds[1]])
+        self.dele = np.gradient(self.clipEle[newinds[0]:newinds[1]], dt)
         const = 4 * np.pi / 0.244 * self.dele
-        dh = np.cos(self.clipEle - Mstart[1])
-        dl =  - Mstart[0] * np.sin(self.clipEle - Mstart[1])
-        self.Mg = np.array([])
-        self.residual = np.array([])
+        dh = np.cos(self.clipEle[newinds[0]:newinds[1]] - starttilt)
+        dl =  - Mstart[0] * np.sin(self.clipEle[newinds[0]:newinds[1]] - starttilt)
         resolution = 1
         #print(factors(self.clipEle.size), resolution)
         dl = np.split(dl, resolution)
         dh = np.split(dh, resolution)
-        fre = np.split(self.freqs, resolution)
-        omg0 = np.split(self.omg0, resolution)
-        err = np.split(np.ones((len(self.freqs),)), resolution)
+        fre = np.split(self.freqs[newinds[0]:newinds[1]], resolution)
+        omg0 = np.split(self.omg0[newinds[0]:newinds[1]], resolution)
+        err = np.split(np.ones((len(self.freqs[newinds[0]:newinds[1]]),)), resolution)
         const = np.split(const, resolution)
         #err = np.split(self.error, resolution)
         for h, l, f, om, e, k in zip(dh, dl, fre, omg0, err, const):
@@ -164,19 +166,19 @@ class refData:
             U, S, V = np.linalg.svd(G, full_matrices=False)
             if (not np.any(S)):
                 pass
-            Gg = np.dot(V, np.dot(np.diag(1/S), U.T))
-            modelRes = np.dot(V, V.T)
-            dataRes = np.dot(U, U.T)
-            #Gg = np.linalg.pinv(G)
+            #Gg = np.dot(V, np.dot(np.diag(1/S), U.T))
+            #modelRes = np.dot(V, V.T)
+            #dataRes = np.dot(U, U.T)
+            Gg = np.linalg.pinv(G)
             mg = np.dot(Gg, (f - om))
-            dg = np.dot(G, mg)
+            dg = k * mg[0] * np.cos(self.clipEle[newinds[0]:newinds[1]] - mg[1])
             res = np.linalg.norm((dg - f)/e) ** 2
             self.residual = np.append(self.residual, res)
             self.invH = mg[0] + Mstart[0]
-            self.invTilt = mg[1] + Mstart[1]
+            self.invTilt = mg[1] + starttilt
             self.Mg = np.append(self.Mg, [self.invH, self.invTilt])
-        np.save('Mg.npy', self.Mg)
-        return self.residual[0]
+        print(self.Mg[-2], np.degrees(self.Mg[-1]), self.residual[-1], dg[-1], f[-1])
+        return self.residual[-1]
 
     def plotHeight(self):
         '''
@@ -259,6 +261,10 @@ class refData:
         plt.ylabel('Tilt (degrees)')
         plt.show()
 
+    def pointInverse(self, Mstart):
+        '''
+        '''
+
 def trim(A, trimval):
     A = np.delete(A, np.s_[:trimval])
     A = np.delete(A, np.s_[-trimval:])
@@ -276,42 +282,33 @@ def factors(n):
 
 if __name__ == '__main__':
     np.set_printoptions(precision=2, suppress=True, linewidth=120)
-    clipRange=(0, 200)
+    clipRange=(0, 18000)
     sat = 'G01'
     
-    height, tilt = 10, 0
+    height, tilt = 10, 10
     t = refData(sat, clipRange, height, tilt)
-
-    #t.R.plotOmegaFWD()
-    t.loadSynthetic(sat, clipRange)
-    Mstart = (10, 0)
-    #print(t.h)
-
-    #t.retrSat(sat)
-    #t.fitAd()
-    #t.clip(clipRange)
-    #np.savetxt('snr.dat', t.clipAm)
-    #t.CWT()
-    
-    t.linearInvert()
-    #t.HvsT()
+    #t.loadSynthetic(sat, clipRange)
+    Mstart = (1, 0)
+    t.retrSat(sat)
+    t.fitAd()
+    t.clip(clipRange)
+    t.CWT()
+    #newFreqs = np.loadtxt('freqs.dat')
+    newinds = (3737, 3739)
+    print(t.clipEle[newinds[0]:newinds[1]], t.clipAzi[newinds[0]:newinds[1]])
+    '''
     t.loadSynthOmega(sat, clipRange, Mstart)
     res = minimize(t.fullInverse, Mstart, method='nelder-mead',
-                   options={'xtol': 1e-3, 'disp': True})
-    print(res.x)
-    #Q = plt.scatter(t.Mg[0::2], t.Mg[1::2], c=t.residual, lw=0)
-    #plt.scatter(height, tilt, marker='x', c='k')
-    #plt.colorbar(Q)
-    #plt.xlabel('Height m')
-    #plt.ylabel('Tilt (degrees)')
-    #plt.show()
-    #print(t.Mg, np.average(t.residual))
-    #print(t.residual)
-    #plt.plot(t.residual)
-    #plt.ylim((0, 5))
-    #plt.show()
+                   options={'xtol': 1, 'disp': True})
+    plt.scatter(t.Mg[::2], np.degrees(t.Mg[1::2]), c=list(range(t.residual.size)))
+    plt.xlabel('Height')
+    plt.ylabel('Tilt')
+    plt.title('Inversion Iterations ' + str(res.nit))
+    plt.grid()
+    plt.savefig('iterations.eps', format='eps', dpi=1000)
+    plt.show()
+    '''
+    #np.savetxt('freqs.dat', t.freqs)
     #np.savetxt('snr.dat', t.clipAm)
-    #t.plotHeight()
-    #t.HvsT()
-    
+
 
