@@ -287,20 +287,20 @@ if __name__ == '__main__':
     
     height, tilt = 10, 10
     t = refData(sat, clipRange, height, tilt)
-    #t.loadSynthetic(sat, clipRange)
     Mstart = (1, 0)
     t.retrSat(sat)
     t.fitAd()
     t.clip(clipRange)
     t.CWT()
-    #newFreqs = np.loadtxt('freqs.dat')
     newinds = (3737, 3739)
     print(t.clipEle[newinds[0]:newinds[1]], t.clipAzi[newinds[0]:newinds[1]])
     '''
     t.loadSynthOmega(sat, clipRange, Mstart)
     res = minimize(t.fullInverse, Mstart, method='nelder-mead',
                    options={'xtol': 1, 'disp': True})
-    plt.scatter(t.Mg[::2], np.degrees(t.Mg[1::2]), c=list(range(t.residual.size)))
+    plt.scatter(t.Mg[::2],
+                np.degrees(t.Mg[1::2]),
+                c=list(range(t.residual.size)))
     plt.xlabel('Height')
     plt.ylabel('Tilt')
     plt.title('Inversion Iterations ' + str(res.nit))
@@ -308,7 +308,3 @@ if __name__ == '__main__':
     plt.savefig('iterations.eps', format='eps', dpi=1000)
     plt.show()
     '''
-    #np.savetxt('freqs.dat', t.freqs)
-    #np.savetxt('snr.dat', t.clipAm)
-
-
