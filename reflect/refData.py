@@ -1,4 +1,4 @@
-from Reflect import Reflect
+from reflect.Reflect import Reflect
 import matplotlib.pyplot as plt
 import numpy as np
 import pycwt as wavelet
@@ -12,6 +12,49 @@ remove the direct signal (5-10 order polynomial)
 '''
 
 class refData:
+    '''
+    Class that does the heavy lifting.  Uses Reflect objects to invert SNR data for the
+    height and elevation of a reflector.
+    
+    Uses the following internal variables:
+
+    :ivar R: Holds the raw data and creates a synthetic data set based on the input
+             height and tilt.
+    :vartype R: Reflect
+
+    :ivar Mg: Contains the corresponding model parameters found through the inversion.
+    :vartype Mg: numpy.ndarray
+
+    :ivar residual: Model parameters residuals.
+    :vartype residual: numpy.ndarray
+    
+    Example usage::
+
+        clipRange=(0, 18000)
+        sat = 'G01'
+        
+        height, tilt = 10, 10
+        t = refData(sat, clipRange, height, tilt)
+        Mstart = (1, 0)
+        t.retrSat(sat)
+        t.fitAd()
+        t.clip(clipRange)
+        t.CWT()
+        newinds = (3737, 3739)
+
+        t.loadSynthOmega(sat, clipRange, Mstart)
+        res = minimize(t.fullInverse, Mstart, method='nelder-mead',
+                       options={'xtol': 1, 'disp': True})
+        plt.scatter(t.Mg[::2],
+                    np.degrees(t.Mg[1::2]),
+                    c=list(range(t.residual.size)))
+        plt.xlabel('Height')
+        plt.ylabel('Tilt')
+        plt.title('Inversion Iterations ' + str(res.nit))
+        plt.grid()
+        plt.savefig('iterations.eps', format='eps', dpi=1000)
+        plt.show()
+    '''
     __slots__ = ['R', 'SNR', 'T', 'Ad',
                  'Am', 'clipT', 'clipAm',
                  'cw', 'periods', 'ele',

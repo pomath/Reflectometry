@@ -12,31 +12,48 @@ class Reflect:
     
     :ivar azimuth: Dictionary containing a list of azimuth
                    and epoch information for each satellite.
-    :type azimuth: dict
+    :vartype azimuth: dict
     :ivar elevation: Dictionary containing a list of elevation
                      and epoch information for each satellite.
-    :type elevation: dict
+    :vartype elevation: dict
     :ivar dataFile: Path to the folder containing the .azi, .ele
-                    and .sn1 files.
-    :type dataFile: str
+                    and .sn1 files.  Can be relative.
+    :vartype dataFile: str
     :ivar SNR: Dictionary containing a list of SNR and epoch
                information for each satellite.
-    :type SNR: dict
+    :vartype SNR: dict
     :ivar omega: Dictionary containing the calculated values for
                  the multipath frequency.
-    :type omega: dict
+    :vartype omega: dict
     :ivar height: Simulated height of a reflector nearby the antenna
                   in meters.
-    :type height: float
+    :vartype height: float
     :ivar maxminOmega: Contains the maximum and minimum values of omega
                        to use for the plot colorbar.
-    :type maxminOmega: tuple
+    :vartype maxminOmega: tuple
     :ivar tilt: Simulated tilt of reflector nearby the antenna in
                 degrees.
-    :type tilt: float
+    :vartype tilt: float
     :ivar label: Used as the title for plots and saving plots.
-    :type label: str
+    :vartype label: str
+
+
+    An example usage to create an SNR vs Time plot and a skytrack::
+
+        R = Reflect('../plot_files/ceri0390', 10, 10)       #Load the tracks from ceri0390
+        sat = 'G01'                                         #Pick out the track for G01
+        time = [x[0] for x in R.SNR[sat]]                   #Separate out the raw SNR and time
+        snr = [x[1] for x in R.SNR[sat]]
+        plt.scatter(time, snr, s=1, lw=0)                   #Plot the SNR vs time
+        plt.xlim((0, 2e4))
+        plt.ylim((20, 60))
+        plt.title('SNR for G01 at CERI')
+        plt.xlabel('Time (s)')
+        plt.ylabel('SNR (dBHz)')
+        plt.savefig('G01CERI.eps', format='eps', dpi=1000)  #Save the figure
+        R.plotTracks()                                      #Create the skytrack for G01
     '''
+
     __slots__ = ['azimuth', 'elevation', 'dataFile',
                  'SNR', 'omega', 'height',
                  'maxminOmega', 'tilt', 'label']
@@ -145,15 +162,15 @@ if __name__ == '__main__':
     '''
     An example usage to create the forward model.
     '''
-    R = Reflect('../plot_files/ceri0390', 10, 10)
-    sat = 'G01'
-    time = [x[0] for x in R.SNR[sat]]
+    R = Reflect('../plot_files/ceri0390', 10, 10)       #Load the tracks from ceri0390
+    sat = 'G01'                                         #Pick out the track for G01
+    time = [x[0] for x in R.SNR[sat]]                   #Separate out the raw SNR and time
     snr = [x[1] for x in R.SNR[sat]]
-    plt.scatter(time, snr, s=1, lw=0)
+    plt.scatter(time, snr, s=1, lw=0)                   #Plot the SNR vs time
     plt.xlim((0, 2e4))
     plt.ylim((20, 60))
     plt.title('SNR for G01 at CERI')
     plt.xlabel('Time (s)')
     plt.ylabel('SNR (dBHz)')
-    plt.savefig('G01CERI.eps', format='eps', dpi=1000)
-    R.plotTracks()
+    plt.savefig('G01CERI.eps', format='eps', dpi=1000)  #Save the figure
+    R.plotTracks()                                      #Create the skytrack for G01

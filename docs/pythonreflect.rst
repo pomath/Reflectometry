@@ -1,8 +1,13 @@
+
+
 **********************************
-Analysis With Python
+Reflect Package
 **********************************
 
-.. automodule:: Reflect
+.. automodule:: reflect
 
-.. autoclass:: Reflect
-   :members:
+    .. autoclass:: Reflect
+       :members:
+    .. autoclass:: refData
+       :members:
+
