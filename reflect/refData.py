@@ -1,10 +1,11 @@
-from reflect.Reflect import Reflect
 import matplotlib.pyplot as plt
 import numpy as np
 import pycwt as wavelet
 from pycwt.helpers import find
 from functools import reduce
 from scipy.optimize import minimize
+from .reflectclass import Reflect
+
 '''
 routines:
 extract a full satellite track between a set time range
@@ -13,21 +14,37 @@ remove the direct signal (5-10 order polynomial)
 
 class refData:
     '''
-    Class that does the heavy lifting.  Uses Reflect objects to invert SNR data for the
-    height and elevation of a reflector.
+    Class that does the heavy lifting.  Uses Reflect objects to invert SNR data
+    for the height and elevation of a reflector.
     
     Uses the following internal variables:
 
-    :ivar R: Holds the raw data and creates a synthetic data set based on the input
-             height and tilt.
+    :ivar R: Holds the raw data and creates a synthetic data set based on the
+             input height and tilt.
     :vartype R: Reflect
 
-    :ivar Mg: Contains the corresponding model parameters found through the inversion.
+    :ivar Mg: Contains the corresponding model parameters found through the
+              inversion.
     :vartype Mg: numpy.ndarray
 
     :ivar residual: Model parameters residuals.
     :vartype residual: numpy.ndarray
-    
+
+
+    :param sat: Sattelite to isolate.
+    :type sat: str
+
+    :param clipRange: Determines the length of the multipath signal to
+                      isolate.  Right now it uses the index instead of an
+                      elevation or time.
+    :type clipRange: tuple
+
+    :param synthH: Height to use in the synthetic model.
+    :type synthH: float
+
+    :param synthT: Tilt to use in the synthetic model.
+    :type synthT: float
+
     Example usage::
 
         clipRange=(0, 18000)
@@ -55,6 +72,7 @@ class refData:
         plt.savefig('iterations.eps', format='eps', dpi=1000)
         plt.show()
     '''
+
     __slots__ = ['R', 'SNR', 'T', 'Ad',
                  'Am', 'clipT', 'clipAm',
                  'cw', 'periods', 'ele',
@@ -64,13 +82,24 @@ class refData:
                  'Mg', 'residual', 'error',
                  'freqs']
 
-    def __init__(self, sat='G01', clipRange=(0, 10000), synthH = 1.0, synthT = 0.0):
-        self.R = Reflect('../plot_files/ceri0390', synthH, synthT)
+    def __init__(self, datafile, sat='G01', clipRange=(0, 10000), synthH = 1.0,
+                 synthT = 0.0):
+
+        self.R = Reflect(datafile, synthH, synthT)
         self.samprate = 1
         self.Mg = np.array([])
         self.residual = np.array([])
 
-    def retrSat(self, sat:str):
+    def retrSat(self, sat):
+        '''
+        Loads the data for a single satellite found in a day's worth of data
+        for a single station.  Could probably leave this out and just keep all
+        the data in the self.R.SNR variables instead of storing it again.
+
+        :param sat: Satellite to isolate.
+        :type sat: str
+        '''
+
         temp = self.R.SNR[sat]
         tmp2 = self.R.elevation[sat]
         tmp3 = self.R.azimuth[sat]
@@ -84,15 +113,30 @@ class refData:
         self.SNR = self.SNR
 
     def plotSat(self):
+        '''
+        Simply plots the SNR after the direct signal has been removed.
+
+        * retrSat(sat)
+        * clip(clipRange)
+        '''
         plt.plot(self.clipT, self.clipAm)
         plt.grid()
         plt.show()
 
     def fitAd(self):
+        '''
+        Simple routine to remove the direct signal.
+        '''
         self.Ad = np.poly1d(np.polyfit(self.T, self.SNR, 10))
         self.Am = self.SNR - self.Ad(self.T)
 
     def clip(self, clipRange:tuple):
+        '''
+        Trims data to clipRange, uses indices instead of data values.
+
+        * retrSat(sat)
+        * fitAd()
+        '''
         self.clipT = self.T - self.T[0]
         self.clipT = self.clipT[clipRange[0]:clipRange[1]]
         self.clipAm = self.Am[:self.clipT.size]
@@ -102,9 +146,14 @@ class refData:
     def CWT(self):
         '''
         Finds the maximum period at each time step.
-            -Need to clean the output more
-                -remove 0's
-                -only take data in the 95%
+        Todo:
+
+        * Need to clean the output more
+            * remove 0's
+            * only take data in the 95%
+        * retrSat(sat)
+        * fitAd()
+        * clip(clipRange)
         '''
         t0 = 0
         dt = 1
@@ -112,7 +161,7 @@ class refData:
         s0 = 2 * dt
         J = 7 / dj
         var = self.clipAm
-        avg1, avg2 = (8, 200)                  # Range of periods to average
+        avg1, avg2 = (8, 200)                # Range of periods to average
         slevel = 0.95                        # Significance level
         std = var.std()                      # Standard deviation
         std2 = std ** 2                      # Variance
@@ -150,7 +199,7 @@ class refData:
         levels = [0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
         maxperiod = np.array([])
         for ind in range(len(coi)):
-            per = nearest(period, coi[ind])
+            per = _nearest(period, coi[ind])
             topind = np.min(np.nonzero(period == per)[0])
             sig95[topind:, ind] = 0
             power[topind:, ind] = 0
@@ -168,11 +217,16 @@ class refData:
 
     def linearInvert(self):
         '''
-        Solves for the height given a period
+        Solves for the height given a period.  Assumes zero tilt.
+
+        * retrSat(sat)
+        * clip(clipRange)
+        * CWT()
         '''
         dt = np.gradient(self.clipT)
         self.dele = np.gradient(self.clipEle, dt)
-        self.h = (self.freqs * 0.244 / (4 * np.pi * self.samprate )) / (np.cos(self.clipEle) * self.dele)
+        self.h = ((self.freqs * 0.244 / (4 * np.pi * self.samprate )) /
+                  (np.cos(self.clipEle) * self.dele))
 
     def fullInverse(self, Mstart = (10, 10)):
         '''
@@ -181,7 +235,12 @@ class refData:
         Then construct the Gg matrix with the starting model
         Then check the residual.
         
-        -currently just ignores any pinv with a zero singular value
+        - currently just ignores any pinv with a zero singular value
+        - Bring the resolution variable out of the interals
+            - Sets how much of the data to invert for.
+
+        * retrSat(sat)
+        * clip(clipRange)
         '''
 
         #self.clipPeriod()
@@ -226,7 +285,13 @@ class refData:
     def plotHeight(self):
         '''
         Plots the height on a track.
+
+        * retrSat(sat)
+        * clip(clipRange)
+        * CWT()
+        * linearInvert()
         '''
+
         print("Plotting height " + u"\u2713")
         ax = plt.subplot(111, projection='polar')
         polars = [(x, np.degrees(np.pi/2-y)) for x, y in
@@ -244,11 +309,26 @@ class refData:
         #print('Saved: ', self.label)
 
     def HvsT(self):
+        '''
+        Just makes a plot of the height versus time.
+
+        * linearInvert()
+        '''
         plt.plot(self.h,'.')
         #plt.xlim((300, 9000))
         plt.show()
 
     def loadSynthetic(self, sat, clipRange):
+        '''
+        Sets all the internal data variables to the forward model.  Height and
+        tilt is set in refData.__init__ and sat and clipRange is set here.
+        
+        :param sat: Satellite to isolate.
+        :type sat: str
+        
+        :param clipRange: Range of indices to isolate.
+        :type clipRange: tuple.
+        '''
         self.R.omegaFWD()
         self.T = np.array([x[0] for x in self.R.azimuth[sat]])
         freqs = np.array([x for x in self.R.omega[sat]])
@@ -261,93 +341,98 @@ class refData:
         self.clipAzi = self.azi[:self.clipT.size]
         #self.error = np.ones((len(self.periods), )) * 0.5
 
-    def loadSynthOmega(self, sat, clipRange, Mstart = (1, 0)):
-        synthR = Reflect('../plot_files/ceri0390', Mstart[0], Mstart[1])
+    def loadSynthOmega(self, datafile, sat, clipRange, Mstart = (1, 0)):
+        '''
+        Used to find the forward model solution for omega when determining the
+        residual of self.fullInverse(Mstart).
+
+        * retrSat(sat)
+        * clip(clipRange)
+        
+        
+        :param datafile: Path to obs rinex.
+        :type datafile: str
+        
+        :param sat: Satellite that is being inverted.
+        :type sat: str
+        
+        :param clipRange: Range of data to clip.
+        :type clipRange: tuple
+        
+        :param Mstart: Starting model guess for the height and tilt.
+        :type Mstart: tuple
+        '''
+        synthR = Reflect(datafile, Mstart[0], Mstart[1])
         synthR.omegaFWD()
         synthomg = np.array([x for x in synthR.omega[sat]])
         self.omg0 = synthomg[:self.clipT.size]
 
     def clipPeriod(self):
-        trimval = self.periods.size // 10
-        self.freqs = trim(self.freqs, trimval)
-        self.clipT = trim(self.clipT, trimval)
-        self.clipEle = trim(self.clipEle, trimval)
-        self.omg0 = trim(self.omg0, trimval)
-
-    def runSynthetic(self, sat):
-        clipRange=(0, 12000)
-        sat = 'G01'
+        '''
+        Used to cut the ends off of the SNR data when running self.CWT() so 
+        that the more uncertain edges are left out.
         
-        height, tilt = 10, 10
-        t = refData(sat, clipRange, height, tilt)
-
-        #t.R.plotOmegaFWD()
-        t.loadSynthetic(sat, clipRange)
-        Mstart = (10, 10)
-        t.linearInvert()
-        #print(t.h)
-        Mstart = (t.h[0], 10)
-        t.loadSynthOmega(sat, clipRange, Mstart)
-        #t.retrSat(sat)
-        #t.fitAd()
-        #t.clip(clipRange)
-        #np.savetxt('snr.dat', t.clipAm)
-        #t.CWT()
-
-        t.fullInverse(Mstart)
-        Q = plt.scatter(t.Mg[0::2], t.Mg[1::2], c=t.residual, lw=0)
-        plt.scatter(height, tilt, marker='x', c='k')
-        plt.colorbar(Q)
-        plt.xlim((9, 11))
-        plt.ylim((9, 11))
-        plt.xlabel('Height m')
-        plt.ylabel('Tilt (degrees)')
-        plt.show()
-
-    def pointInverse(self, Mstart):
+        * retrSat(sat)
+        * clip(clipRange)
+        * CWT()
+        * loadSynthOmega(datafile,sat,clipRange,Mstart)
         '''
-        '''
+        trimval = self.periods.size // 10
+        self.freqs = _trim(self.freqs, trimval)
+        self.clipT = _trim(self.clipT, trimval)
+        self.clipEle = _trim(self.clipEle, trimval)
+        self.omg0 = _trim(self.omg0, trimval)
 
-def trim(A, trimval):
+def runSynthetic(sat = 'G01'):
+    '''
+    Used to test the inversion on synthetic data.
+
+    * Add a return value
+    
+    :param sat: Satellite to isolate.
+    :type sat: str
+    '''
+    clipRange=(0, 12000)
+
+    height, tilt = 10, 10
+    t = refData(sat, clipRange, height, tilt)
+
+    #t.R.plotOmegaFWD()
+    t.loadSynthetic(sat, clipRange)
+    Mstart = (10, 10)
+    t.linearInvert()
+    #print(t.h)
+    Mstart = (t.h[0], 10)
+    t.loadSynthOmega(sat, clipRange, Mstart)
+    #t.retrSat(sat)
+    #t.fitAd()
+    #t.clip(clipRange)
+    #np.savetxt('snr.dat', t.clipAm)
+    #t.CWT()
+
+    t.fullInverse(Mstart)
+    Q = plt.scatter(t.Mg[0::2], t.Mg[1::2], c=t.residual, lw=0)
+    plt.scatter(height, tilt, marker='x', c='k')
+    plt.colorbar(Q)
+    plt.xlim((9, 11))
+    plt.ylim((9, 11))
+    plt.xlabel('Height m')
+    plt.ylabel('Tilt (degrees)')
+    plt.show()
+
+def _trim(A, trimval):
     A = np.delete(A, np.s_[:trimval])
     A = np.delete(A, np.s_[-trimval:])
     return A
 
-def nearest(items, pivot):
+def _nearest(items, pivot):
     '''
     Gets the closest value to pivot in items.
     '''
     return min(items, key=lambda x: abs(x - pivot))
 
-def factors(n):    
+def _factors(n):    
     return set(reduce(list.__add__, 
                 ([i, n//i] for i in range(1, int(n**0.5) + 1) if n % i == 0)))
 
-if __name__ == '__main__':
-    np.set_printoptions(precision=2, suppress=True, linewidth=120)
-    clipRange=(0, 18000)
-    sat = 'G01'
-    
-    height, tilt = 10, 10
-    t = refData(sat, clipRange, height, tilt)
-    Mstart = (1, 0)
-    t.retrSat(sat)
-    t.fitAd()
-    t.clip(clipRange)
-    t.CWT()
-    newinds = (3737, 3739)
-    print(t.clipEle[newinds[0]:newinds[1]], t.clipAzi[newinds[0]:newinds[1]])
-    '''
-    t.loadSynthOmega(sat, clipRange, Mstart)
-    res = minimize(t.fullInverse, Mstart, method='nelder-mead',
-                   options={'xtol': 1, 'disp': True})
-    plt.scatter(t.Mg[::2],
-                np.degrees(t.Mg[1::2]),
-                c=list(range(t.residual.size)))
-    plt.xlabel('Height')
-    plt.ylabel('Tilt')
-    plt.title('Inversion Iterations ' + str(res.nit))
-    plt.grid()
-    plt.savefig('iterations.eps', format='eps', dpi=1000)
-    plt.show()
-    '''
+

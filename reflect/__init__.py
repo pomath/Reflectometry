@@ -1,3 +1,3 @@
-from reflect.refData import refData
-from reflect.Reflect import Reflect
+from .refData import refData
+from .reflectclass import Reflect
 

@@ -69,12 +69,15 @@ class Reflect:
         self.label = ('../plots/FWD_' + str(self.height) + 'm_' +
                       '{:04.4}deg'.format(np.degrees(self.tilt)))
 
-    def plotTracks(self):
+    def plotTracks(self, sats=['G01']):
         '''
         Plots the satellite tracks recorded at a station.
+        
+        :param sats: Satellites to plot.
+        :type sats: list
         '''
         ax = plt.subplot(111, projection='polar')
-        for key in ['G01']:
+        for key in sats:
             if self.azimuth[key] != []:
                 polars = [(np.radians(x[1]), 90-y[1]) for x, y in
                           zip(self.azimuth[key], self.elevation[key])]
@@ -84,7 +87,7 @@ class Reflect:
         ax.set_rmax(90.0)
         ax.set_yticks(range(0, 90, 10))
         ax.set_yticklabels(map(str, range(90, 0, -10)))
-        plt.title(self.dataFile + ' Height: ' + str(self.height) + 'm')
+        plt.title('G01CERITrack')
         plt.savefig('G01CERITrack.eps', format='eps', dpi=1000)
 
     def omegaFWD(self):
@@ -145,32 +148,3 @@ class Reflect:
         plt.title(self.label)
         plt.savefig(self.label + '.eps', format='eps', dpi=1000)
         print('Saved: ', self.label)
-
-    def saveSNR(self):
-        '''
-        Saves synthetic data to be run through the inversion.
-        '''
-
-    def getFullTrack(self):
-        '''
-        Returns a full satellite pass.
-        '''
-        print('hello')
-
-
-if __name__ == '__main__':
-    '''
-    An example usage to create the forward model.
-    '''
-    R = Reflect('../plot_files/ceri0390', 10, 10)       #Load the tracks from ceri0390
-    sat = 'G01'                                         #Pick out the track for G01
-    time = [x[0] for x in R.SNR[sat]]                   #Separate out the raw SNR and time
-    snr = [x[1] for x in R.SNR[sat]]
-    plt.scatter(time, snr, s=1, lw=0)                   #Plot the SNR vs time
-    plt.xlim((0, 2e4))
-    plt.ylim((20, 60))
-    plt.title('SNR for G01 at CERI')
-    plt.xlabel('Time (s)')
-    plt.ylabel('SNR (dBHz)')
-    plt.savefig('G01CERI.eps', format='eps', dpi=1000)  #Save the figure
-    R.plotTracks()                                      #Create the skytrack for G01

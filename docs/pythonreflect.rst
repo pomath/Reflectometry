@@ -4,10 +4,10 @@
 Reflect Package
 **********************************
 
-.. automodule:: reflect
+.. py:module:: reflect
 
-    .. autoclass:: Reflect
-       :members:
-    .. autoclass:: refData
-       :members:
+.. autoclass:: Reflect
+   :members:
 
+.. autoclass:: refData
+   :members:
