@@ -94,3 +94,9 @@ demian_code/
 *.pdf
 *.dat
 plots/
+
+*.eps
+
+*.npy
+
+*.png

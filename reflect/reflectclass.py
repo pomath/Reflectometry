@@ -56,7 +56,8 @@ class Reflect:
 
     __slots__ = ['azimuth', 'elevation', 'dataFile',
                  'SNR', 'omega', 'height',
-                 'maxminOmega', 'tilt', 'label']
+                 'maxminOmega', 'tilt', 'label',
+                 'samprate']
 
     def __init__(self, dataFile, height, tilt):
         self.tilt = np.radians(tilt)
@@ -68,27 +69,29 @@ class Reflect:
         self.omegaFWD()
         self.label = ('../plots/FWD_' + str(self.height) + 'm_' +
                       '{:04.4}deg'.format(np.degrees(self.tilt)))
+        self.samprate = snowy.Data(dataFile + '.azi').getSamprate()
 
-    def plotTracks(self, sats=['G01']):
+    def plotTracks(self, sats=['G01'], savename = 'sampletracks.eps'):
         '''
         Plots the satellite tracks recorded at a station.
         
         :param sats: Satellites to plot.
         :type sats: list
         '''
+        colors = np.linspace(0.01, 0.99, len(self.azimuth[sats[0]]))
         ax = plt.subplot(111, projection='polar')
         for key in sats:
             if self.azimuth[key] != []:
                 polars = [(np.radians(x[1]), 90-y[1]) for x, y in
                           zip(self.azimuth[key], self.elevation[key])]
-                plt.scatter(*zip(*polars), linewidths=.05, s=.5)
+                plt.scatter(*zip(*polars), linewidths=.05, s=.5, c=colors, cmap='Greys')
         ax.set_theta_zero_location('N')
         ax.set_theta_direction(-1)
         ax.set_rmax(90.0)
         ax.set_yticks(range(0, 90, 10))
         ax.set_yticklabels(map(str, range(90, 0, -10)))
-        plt.title('G01CERITrack')
-        plt.savefig('G01CERITrack.eps', format='eps', dpi=1000)
+        plt.title('Skyplot')
+        plt.savefig(savename, format='eps', dpi=1000)
 
     def omegaFWD(self):
         '''
@@ -114,11 +117,11 @@ class Reflect:
                     maxVal = max(self.omega[sat])
         self.maxminOmega = (minVal, maxVal)
 
-    def plotOmegaFWD(self):
+    def plotOmegaFWD(self, savename = 'sample.png'):
         '''
         Plots the frequency on a track.
         '''
-        samp = 100
+        samp = 1
         ax = plt.subplot(111, projection='polar')
         for key in self.elevation:
             if self.azimuth[key]:
@@ -145,6 +148,6 @@ class Reflect:
         ax.set_rmax(90.0)
         ax.set_yticks(range(0, 90, 10))
         ax.set_yticklabels(map(str, range(90, 0, -10)))
-        plt.title(self.label)
-        plt.savefig(self.label + '.eps', format='eps', dpi=1000)
-        print('Saved: ', self.label)
+        plt.title('DEVI')
+        plt.savefig(savename, format='png', dpi=100)
+        print('Saved: ', savename)
